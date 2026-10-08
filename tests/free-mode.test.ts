@@ -48,3 +48,9 @@ test("free-mode profile produces a real keyword score", () => {
   const s = quickScore(p, { title: "Business Development Manager", description: "B2B sales, Salesforce, contract negotiation and market analysis in SaaS" });
   assert.ok(s.score >= 60, `score ${s.score}`);
 });
+
+test("mojibake from PDF extraction is repaired, clean text untouched", async () => {
+  const { fixMojibake } = await import("../src/lib/cv/heuristic");
+  assert.equal(fixMojibake("Universitat PolitÃ¨cnica de ValÃ¨ncia"), "Universitat Politècnica de València");
+  assert.equal(fixMojibake("Tiranë, Shqipëri"), "Tiranë, Shqipëri");
+});

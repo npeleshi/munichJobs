@@ -59,3 +59,10 @@ export function parseLanguages(s: string): { language: string; level: string }[]
   });
 }
 export const parseList = (s: string) => [...new Set(s.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean))];
+
+/** Repairs UTF-8 text that was decoded as Latin-1 (e.g. "PolitÃ¨cnica" → "Politècnica"). */
+export function fixMojibake(text: string): string {
+  if (!/[ÃÂÅÄ][\u0080-\u00BF]/.test(text)) return text;
+  const repaired = Buffer.from(text, "latin1").toString("utf8");
+  return repaired.includes("\uFFFD") ? text : repaired;
+}

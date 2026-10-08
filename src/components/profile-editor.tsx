@@ -5,12 +5,22 @@ import { api } from "@/lib/client";
 import { Notice } from "./ui";
 import type { CvProfile } from "@/lib/cv/profile";
 
-const list = (s: string) => [...new Set(s.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean))];
-const langs = (s: string) =>
-  s.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean).map((x) => {
-    const [language, ...rest] = x.split(/[:\-–(]/);
-    return { language: language.trim(), level: rest.join(" ").replace(/\)/g, "").trim() || "not specified" };
-  });
+// Accepts commas, semicolons, new lines, bullets ("- item") and " - " as separators.
+const clean = (x: string) => x.replace(/^[-–•*·]\s*/, "").trim();
+const list = (s: string) => [...new Set(s.split(/[,;\n•]|\s[-–]\s/).map(clean).filter(Boolean))];
+const LEVEL_RE = /^(a1|a2|b1|b2|c1|c2|native|fluent|basic|intermediate|advanced|mother tongue|muttersprache|fließend|amtare)$/i;
+const langs = (s: string) => {
+  const out: { language: string; level: string }[] = [];
+  for (const raw of list(s)) {
+    if (LEVEL_RE.test(raw) && out.length && out[out.length - 1].level === "not specified") {
+      out[out.length - 1].level = raw; // "German - B2" → German: B2
+      continue;
+    }
+    const m = raw.match(/^([^:(]+?)\s*[:(]\s*([^)]*)\)?$/);
+    out.push(m ? { language: m[1].trim(), level: m[2].trim() || "not specified" } : { language: raw, level: "not specified" });
+  }
+  return out;
+};
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return <div><label className="label">{label}</label>{children}{hint && <p className="mt-1 text-xs text-ink-400">{hint}</p>}</div>;
@@ -51,7 +61,9 @@ export function ProfileEditor({ profile, onSaved }: { profile: CvProfile; onSave
       onSaved(r.profile);
       setMsg({ tone: "ok", text: "Profile saved. Match scores were updated." });
     } catch (e) {
-      setMsg({ tone: "error", text: (e as Error).message });
+      const fields = (e as { details?: { fieldErrors?: Record<string, string[]> } }).details?.fieldErrors;
+      const which = fields ? Object.keys(fields).join(", ") : "";
+      setMsg({ tone: "error", text: which ? `Please check: ${which}` : (e as Error).message });
     } finally {
       setBusy(false);
     }
@@ -74,7 +86,7 @@ export function ProfileEditor({ profile, onSaved }: { profile: CvProfile; onSave
       <Field label="Skills" hint="Comma-separated. These are matched against every job ad, e.g. B2B sales, Salesforce, contract negotiation, market analysis">
         <textarea className="input min-h-[80px]" value={f.skills} onChange={set("skills")} />
       </Field>
-      <Field label="Languages" hint="e.g. German: B2, English: C1, Albanian: native">
+      <Field label="Languages" hint="e.g. German: B2, English: C1, Albanian: native (commas, new lines or dashes all work)">
         <input className="input" value={f.languages} onChange={set("languages")} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">

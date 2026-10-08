@@ -1,6 +1,7 @@
 // Text extraction from uploaded CVs. PDF via pdf-parse, DOCX via mammoth.
 // Scanned (image-only) PDFs yield no text – we report that instead of guessing.
 import mammoth from "mammoth";
+import { fixMojibake } from "./heuristic";
 
 export const ALLOWED_MIME: Record<string, "pdf" | "docx"> = {
   "application/pdf": "pdf",
@@ -23,9 +24,10 @@ export async function extractCvText(buf: Buffer, kind: "pdf" | "docx"): Promise<
   } else {
     text = (await mammoth.extractRawText({ buffer: buf })).value;
   }
-  text = text.replace(/\r/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  text = fixMojibake(text).replace(/\r/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
   if (text.length < 200) {
     throw new Error("Very little text could be extracted. If this is a scanned PDF, please upload a text-based PDF or DOCX.");
   }
   return text;
 }
+

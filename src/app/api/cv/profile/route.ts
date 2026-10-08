@@ -4,22 +4,27 @@ import { route, requireUser, HttpError } from "@/lib/http";
 import { prisma } from "@/lib/db";
 import { encryptString } from "@/lib/crypto";
 import { loadCv } from "@/lib/cv/store";
-import { emptyProfile } from "@/lib/cv/heuristic";
+import { emptyProfile, fixMojibake } from "@/lib/cv/heuristic";
 import { quickScore } from "@/lib/cv/quickscore";
 
+// Lenient: long values are trimmed instead of rejected, so a pasted CV section never blocks saving.
+const str = (max: number) => z.string().transform((v) => v.trim().slice(0, max));
+const nstr = (max: number) => z.string().nullable().transform((v) => (v ? v.trim().slice(0, max) : null));
+const arr = <T extends z.ZodTypeAny>(item: T, max: number) => z.array(item).transform((a) => a.slice(0, max));
+
 const schema = z.object({
-  name: z.string().max(120).nullable(),
-  email: z.string().max(254).nullable(),
-  phone: z.string().max(60).nullable(),
-  location: z.string().max(120).nullable(),
-  headline: z.string().max(160).nullable(),
-  totalYearsExperience: z.number().int().min(0).max(60).nullable(),
-  skills: z.array(z.string().max(60)).max(60),
-  languages: z.array(z.object({ language: z.string().max(40), level: z.string().max(40) })).max(15),
-  industries: z.array(z.string().max(60)).max(20),
-  careerInterests: z.array(z.string().max(80)).max(20),
-  achievements: z.array(z.string().max(300)).max(10),
-  certifications: z.array(z.string().max(120)).max(20),
+  name: nstr(120),
+  email: nstr(254),
+  phone: nstr(60),
+  location: nstr(120),
+  headline: nstr(160),
+  totalYearsExperience: z.number().nullable().transform((n) => (n == null || !Number.isFinite(n) ? null : Math.max(0, Math.min(60, Math.round(n))))),
+  skills: arr(str(80), 80),
+  languages: arr(z.object({ language: str(60), level: str(60) }), 20),
+  industries: arr(str(80), 30),
+  careerInterests: arr(str(120), 30),
+  achievements: arr(str(500), 20),
+  certifications: arr(str(250), 30),
 });
 
 export const PUT = route(async (req) => {
@@ -27,7 +32,7 @@ export const PUT = route(async (req) => {
   const input = schema.parse(await req.json());
   const cv = await loadCv(userId);
   if (!cv) throw new HttpError(400, "Upload your CV first.");
-  const profile = { ...emptyProfile(), ...(cv.profile ?? {}), ...input };
+  const profile = JSON.parse(fixMojibake(JSON.stringify({ ...emptyProfile(), ...(cv.profile ?? {}), ...input })));
   await prisma.cv.update({ where: { userId }, data: { profileEnc: encryptString(JSON.stringify(profile)) } });
   const rows = await prisma.userJob.findMany({ where: { userId }, include: { job: true } });
   for (const r of rows) {
