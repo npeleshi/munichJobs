@@ -1,0 +1,16 @@
+{
+  "name": "Munich Job Assistant",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "forwardPorts": [3000],
+  "portsAttributes": { "3000": { "label": "App", "onAutoForward": "openBrowser" } },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "secrets": {
+    "ANTHROPIC_API_KEY": { "description": "Claude API key for CV analysis, scoring and drafting (console.anthropic.com)" },
+    "GOOGLE_CLIENT_ID": { "description": "Optional: Google OAuth client ID for Gmail sending" },
+    "GOOGLE_CLIENT_SECRET": { "description": "Optional: Google OAuth client secret" },
+    "ADZUNA_APP_ID": { "description": "Optional: Adzuna app id" },
+    "ADZUNA_APP_KEY": { "description": "Optional: Adzuna app key" }
+  }
+}

@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+body { @apply bg-ink-50 text-ink-900 antialiased; }
+
+@layer components {
+  .card { @apply rounded-2xl border border-ink-200/70 bg-white shadow-card; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-primary { @apply btn bg-ink-900 text-white hover:bg-ink-800; }
+  .btn-accent { @apply btn bg-isar-600 text-white hover:bg-isar-700; }
+  .btn-ghost { @apply btn border border-ink-200 bg-white text-ink-800 hover:bg-ink-100; }
+  .input { @apply w-full rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-ink-400 focus:border-isar-500 focus:ring-2 focus:ring-isar-100; }
+  .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition; }
+  .chip-on { @apply chip border-ink-900 bg-ink-900 text-white; }
+  .chip-off { @apply chip border-ink-200 bg-white text-ink-700 hover:border-ink-400; }
+  .prose-job { @apply whitespace-pre-line text-sm leading-relaxed text-ink-800; }
+}
