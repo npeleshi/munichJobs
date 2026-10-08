@@ -8,6 +8,7 @@ import { BANNED_PHRASES, draftApplication } from "@/lib/ai-tasks";
 import { loadCv } from "@/lib/cv/store";
 import { factCheck } from "@/lib/mail/factcheck";
 import { rank } from "@/lib/contacts/extract";
+import { templateDraft } from "@/lib/mail/template";
 
 export const maxDuration = 60;
 
@@ -32,8 +33,8 @@ const createSchema = z.object({
 /** Create or regenerate the draft for a job. Never sends anything. */
 export const POST = route(async (req) => {
   const userId = await requireUser();
-  if (!aiConfigured()) throw new HttpError(503, "AI is not configured (ANTHROPIC_API_KEY missing).");
-  limit(userId, "ai", LIMITS.ai);
+  const useAi = aiConfigured();
+  if (useAi) limit(userId, "ai", LIMITS.ai);
   const input = createSchema.parse(await req.json());
 
   const existing = await prisma.application.findUnique({ where: { userId_jobId: { userId, jobId: input.jobId } } });
@@ -44,13 +45,13 @@ export const POST = route(async (req) => {
     prisma.job.findUnique({ where: { id: input.jobId }, include: { contacts: true } }),
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
   ]);
-  if (!cv?.profile) throw new HttpError(400, "Upload your CV (and let it be analysed) before preparing applications.");
+  if (!cv?.profile) throw new HttpError(400, "Upload your CV (and complete your profile) before preparing applications.");
   if (!job) throw new HttpError(404, "Job not found");
 
   const language = input.language !== "auto" ? input.language : user.preferredLanguage !== "auto" ? (user.preferredLanguage as "de" | "en") : ((job.language as "de" | "en") ?? "de");
   const contact = [...job.contacts].sort((a, b) => rank(b.kind as never) - rank(a.kind as never))[0] ?? null;
 
-  const draft = await draftApplication({
+  const draftInput = {
     profile: cv.profile,
     cvText: cv.text,
     job,
@@ -59,7 +60,11 @@ export const POST = route(async (req) => {
     withCoverLetter: input.withCoverLetter,
     signature: user.signature,
     instructions: input.instructions,
-  });
+  };
+  // Free mode uses a fact-only template; with an API key Claude writes a tailored draft.
+  const draft = useAi
+    ? await draftApplication(draftInput)
+    : templateDraft({ profile: cv.profile, job, language, recipientName: draftInput.recipientName, withCoverLetter: input.withCoverLetter, signature: user.signature });
   const warnings = factCheck(draft, cv.text, job, BANNED_PHRASES);
   const data = {
     subject: draft.subject,

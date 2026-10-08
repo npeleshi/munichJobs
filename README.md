@@ -35,6 +35,15 @@ Nothing in the app substitutes mock data: if a source fails, the search result l
 
 ---
 
+### Free mode (no API key, no cost)
+Leave `ANTHROPIC_API_KEY` empty and the app runs fully free:
+* On CV upload a basic profile (name, contact, languages, skills section) is pre-filled from the CV text with simple rules.
+* You complete **CV & Profile → Your profile** (skills, languages, achievements). Match scores are keyword estimates based on it.
+* **Create draft from template** builds the e-mail (DE/EN) from your profile fields plus the job title, company and reference number — nothing invented; you edit it before sending.
+* Search, contact discovery, tracking, alerts and sending work exactly the same.
+
+Add a key later to switch on AI analysis, explained scores and tailored drafts.
+
 ## 2. Architecture
 
 * **Next.js 14 (App Router) + TypeScript** – UI and API routes in one deployable unit.

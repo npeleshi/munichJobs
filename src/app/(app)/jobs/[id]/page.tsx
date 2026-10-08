@@ -42,6 +42,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
   const [ackWarnings, setAckWarnings] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [notes, setNotes] = useState("");
+  const [aiOn, setAiOn] = useState(false);
   const appRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -59,7 +60,8 @@ export default function JobPage({ params }: { params: { id: string } }) {
       })
       .catch((e) => setErr(e.message));
     api<{ cv: { fileName: string } | null }>("/api/cv").then((r) => setCvName(r.cv?.fileName ?? null)).catch(() => setCvName(null));
-    api<{ mailboxes: { connected: string[] }; user: { sendProvider: string | null } }>("/api/settings").then((r) => {
+    api<{ mailboxes: { connected: string[] }; user: { sendProvider: string | null }; integrations: { ai: boolean } }>("/api/settings").then((r) => {
+      setAiOn(r.integrations.ai);
       setProviders(r.mailboxes.connected);
       setProvider(r.user.sendProvider && r.mailboxes.connected.includes(r.user.sendProvider) ? r.user.sendProvider : r.mailboxes.connected[0] ?? "");
     });
@@ -158,10 +160,10 @@ export default function JobPage({ params }: { params: { id: string } }) {
           <div className="card p-6">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold">CV match</h2>
-              <button className="btn-ghost text-xs" onClick={evaluate} disabled={busy === "score"}>{busy === "score" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {m ? "Re-evaluate" : "Evaluate with AI"}</button>
+              {aiOn && <button className="btn-ghost text-xs" onClick={evaluate} disabled={busy === "score"}>{busy === "score" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {m ? "Re-evaluate" : "Evaluate with AI"}</button>}
             </div>
             {!m ? (
-              <p className="mt-2 text-sm text-ink-500">{userJob.quickScore != null ? `Keyword estimate: ${userJob.quickScore}/100. Run the AI evaluation for a full explanation.` : "Upload your CV to get match scores."}</p>
+              <p className="mt-2 text-sm text-ink-500">{userJob.quickScore != null ? `Keyword estimate: ${userJob.quickScore}/100 – based on how many of your profile skills and role keywords appear in this ad.${aiOn ? " Run the AI evaluation for a full explanation." : ""}` : "Upload your CV and fill in your profile skills to get match scores."}</p>
             ) : (
               <div className="mt-3 space-y-4 text-sm">
                 <p className="text-ink-800">{m.summary} <span className={clsx("ml-1 rounded-full px-2 py-0.5 text-xs font-medium", m.realistic === "strong" || m.realistic === "realistic" ? "bg-isar-100 text-isar-700" : "bg-amber-100 text-amber-600")}>{m.realistic}</span></p>
@@ -228,8 +230,8 @@ export default function JobPage({ params }: { params: { id: string } }) {
                   <option value="en">English</option>
                 </select>
                 <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={withCover} onChange={(e) => setWithCover(e.target.checked)} /> Cover letter (PDF)</label>
-                <input className="input flex-1" placeholder="Optional instruction, e.g. mention my notice period of 3 months" value={instructions} onChange={(e) => setInstructions(e.target.value)} />
-                <button className="btn-accent" onClick={generate} disabled={busy === "generate" || !cvName}>{busy === "generate" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} {draft ? "Regenerate" : "Generate draft"}</button>
+                {aiOn && <input className="input flex-1" placeholder="Optional instruction, e.g. mention my notice period of 3 months" value={instructions} onChange={(e) => setInstructions(e.target.value)} />}
+                <button className="btn-accent" onClick={generate} disabled={busy === "generate" || !cvName}>{busy === "generate" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} {draft ? "Regenerate" : aiOn ? "Generate draft" : "Create draft from template"}</button>
               </div>
             )}
 

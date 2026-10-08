@@ -9,6 +9,7 @@ import { aiConfigured } from "@/lib/ai";
 import { analyzeCv } from "@/lib/ai-tasks";
 import { quickScore } from "@/lib/cv/quickscore";
 import { logger } from "@/lib/logger";
+import { heuristicProfile } from "@/lib/cv/heuristic";
 
 export const maxDuration = 90;
 
@@ -54,7 +55,11 @@ export const POST = route(async (req) => {
       analysisError = (e as Error).message;
       logger.warn("cv analysis failed", { err: analysisError });
     }
-  } else analysisError = "AI is not configured – CV stored, but not analysed.";
+  } else {
+    // Free mode: pre-fill a basic profile from the CV text; the user completes it on the CV page.
+    profileEnc = encryptString(JSON.stringify(heuristicProfile(text)));
+    analysisError = "Free mode (no AI): a basic profile was filled in from your CV. Please check it and add your skills and achievements below – they drive match scores and e-mail drafts.";
+  }
 
   const data = { fileName, mimeType, sizeBytes: buf.length, fileEnc: encryptBuffer(buf), textEnc: encryptString(text), profileEnc, analyzedAt };
   await prisma.cv.upsert({ where: { userId }, create: { userId, ...data }, update: data });

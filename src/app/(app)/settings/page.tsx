@@ -99,7 +99,7 @@ export default function SettingsPage() {
             <Row ok={s.integrations.arbeitsagentur} label="Bundesagentur für Arbeit" hint="Public Jobbörse API – no key needed." />
             <Row ok={s.integrations.arbeitnow} label="Arbeitnow" hint="Free ATS job feed – no key needed." />
             <Row ok={s.integrations.adzuna} label="Adzuna" hint="Needs ADZUNA_APP_ID and ADZUNA_APP_KEY (free at developer.adzuna.com)." />
-            <Row ok={s.integrations.ai} label={`Claude AI (${s.integrations.aiModel})`} hint="Needs ANTHROPIC_API_KEY – CV analysis, scoring, drafting." />
+            <Row ok={s.integrations.ai} label={`Claude AI (${s.integrations.aiModel})`} hint={s.integrations.ai ? "AI CV analysis, explained scores and tailored drafts are on." : "Optional (paid per use). Free mode is active: keyword scores from your profile + template drafts."} />
             <Row ok={s.integrations.cron} label="Scheduled refresh" hint="Needs CRON_SECRET and a scheduler calling /api/cron/refresh." />
             <Row ok={false} label="LinkedIn, Indeed, StepStone, XING, Glassdoor, Jobware" hint="No permitted automated access – pre-filled search links are shown with each search." />
           </ul>
