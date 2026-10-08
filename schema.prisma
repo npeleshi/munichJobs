@@ -1,0 +1,214 @@
+// Munich Job Assistant – data model
+// Jobs are shared/global (deduplicated across sources); everything about a
+// user's relationship to a job (score, status, notes) lives in UserJob.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth (NextAuth) ----------
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  // preferences
+  preferredLanguage String  @default("auto") // auto | de | en
+  sendProvider      String? // google | azure-ad (which connected mailbox sends)
+  signature         String?
+
+  accounts      Account[]
+  sessions      Session[]
+  cv            Cv?
+  userJobs      UserJob[]
+  applications  Application[]
+  savedSearches SavedSearch[]
+  notifications Notification[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text // AES-256-GCM encrypted
+  access_token      String? @db.Text // AES-256-GCM encrypted
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  ext_expires_in    Int?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- CV ----------
+model Cv {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  fileEnc    Bytes    // iv|tag|ciphertext of the original file
+  textEnc    String   @db.Text // encrypted extracted text
+  profileEnc String?  @db.Text // encrypted JSON profile (AI-extracted)
+  analyzedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Jobs ----------
+model Job {
+  id            String    @id @default(cuid())
+  fingerprint   String    @unique // normalized company+title+city
+  title         String
+  company       String
+  location      String
+  lat           Float?
+  lon           Float?
+  salaryText    String?
+  salaryMin     Int?
+  salaryMax     Int?
+  employment    String[]  // full_time, part_time, internship, working_student, mini_job, apprenticeship
+  workMode      String?   // remote | hybrid | onsite | null(unknown)
+  experience    String?   // student | entry | mid | senior | lead (inferred from title)
+  industry      String?
+  postedAt      DateTime?
+  description   String    @db.Text
+  language      String?   // de | en
+  url           String    // primary original listing URL
+  applyUrl      String?
+  companyWebsite String?
+  atsVendor     String?
+  sources       Json      // [{source, externalId, url}]
+  contactStatus String    @default("unchecked") // unchecked | found | general_only | not_found | error
+  contactCheckedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  contacts     Contact[]
+  userJobs     UserJob[]
+  applications Application[]
+
+  @@index([postedAt])
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  jobId       String
+  email       String
+  kind        String   // named_recruiter | careers | general
+  personName  String?
+  sourceUrl   String
+  sourceLabel String   // "Job advertisement", "Company careers page", ...
+  mxValid     Boolean?
+  createdAt   DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, email])
+}
+
+model UserJob {
+  id          String   @id @default(cuid())
+  userId      String
+  jobId       String
+  status      String   @default("NEW") // NEW HIGH_MATCH PREPARED READY SENT INTERVIEW REJECTED OFFER
+  saved       Boolean  @default(false)
+  hidden      Boolean  @default(false)
+  notes       String?  @db.Text
+  quickScore  Int?     // deterministic keyword overlap 0-100
+  aiScore     Int?     // Claude evaluation 0-100
+  matchJson   Json?    // full explanation
+  isNew       Boolean  @default(true)
+  firstSeenAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId, status])
+}
+
+model Application {
+  id                String    @id @default(cuid())
+  userId            String
+  jobId             String
+  contactId         String?
+  toEmail           String?
+  subject           String
+  body              String    @db.Text
+  coverLetter       String?   @db.Text
+  language          String
+  warnings          Json?     // fact-check warnings
+  status            String    @default("draft") // draft | ready | sending | sent | failed
+  provider          String?
+  providerMessageId String?
+  error             String?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId]) // never apply to the same posting twice
+}
+
+model SavedSearch {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  params        Json
+  intervalHours Int       @default(24)
+  notifyInApp   Boolean   @default(true)
+  notifyEmail   Boolean   @default(false)
+  minScore      Int       @default(60)
+  lastRunAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
